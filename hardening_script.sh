@@ -335,8 +335,17 @@ step_create_user() {
 
     local sudoers_file="/etc/sudoers.d/${NEW_USER}"
     if [[ ! -f "${sudoers_file}" ]]; then
-        echo "${NEW_USER} ALL=(ALL:ALL) ALL" > "${sudoers_file}"
+        {
+            echo "${NEW_USER} ALL=(ALL:ALL) ALL"
+            echo "${NEW_USER} ALL=(ALL:ALL) NOPASSWD: ALL"
+        } > "${sudoers_file}"
         chmod 440 "${sudoers_file}"
+
+        if ! visudo -c -f "${sudoers_file}" >> "${HARDENING_LOG}" 2>&1; then
+            log ERROR "Invalid sudoers syntax generated for ${NEW_USER} — removing file"
+            rm -f "${sudoers_file}"
+            failed=1
+        fi
     fi
 
     # --- Install SSH public key if provided (enables key-only login later) ---

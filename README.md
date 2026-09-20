@@ -35,6 +35,34 @@ If you leave `NEW_USER_SSH_PUBKEY` empty, SSH password authentication stays
 on (weaker, but you won't be locked out without a key ready). If you provide
 a key, the script installs it and switches to key-only login automatically.
 
+## Sudo permission: passwordless by default
+
+The script grants `NEW_USER` **passwordless sudo** (`NOPASSWD: ALL`), written
+to `/etc/sudoers.d/<NEW_USER>`:
+
+```
+guest ALL=(ALL:ALL) ALL
+guest ALL=(ALL:ALL) NOPASSWD: ALL
+```
+
+This is convenient if you're chaining more automation on top (no password
+prompts breaking a scripted sequence), but it does mean anything that runs
+as that user — a compromised app, a phished session — can escalate to root
+instantly without needing to know any password. If you'd rather require a
+password for sudo (more secure, more friction), open the script and find
+this block in `step_create_user()`:
+
+```bash
+{
+    echo "${NEW_USER} ALL=(ALL:ALL) ALL"
+    echo "${NEW_USER} ALL=(ALL:ALL) NOPASSWD: ALL"
+} > "${sudoers_file}"
+```
+
+Delete the `NOPASSWD: ALL` line (keep just the first `echo`) before running
+the script, or edit `/etc/sudoers.d/<user>` afterward and remove that line,
+then run `visudo -c` to confirm the file is still syntactically valid.
+
 ## Usage
 
 ```bash
