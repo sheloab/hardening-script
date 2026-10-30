@@ -26,10 +26,15 @@ NEW_HOSTNAME="CHANGE_ME_HOSTNAME"                # this server's hostname
 ALERT_EMAIL="CHANGE_ME_ALERT_EMAIL"              # fail2ban notification email
 NEW_USER_SSH_PUBKEY=""                           # optional: paste a public key to enable key-only SSH login
 SSH_ALLOWED_IPS="CHANGE_ME_YOUR_CURRENT_IP"       # your real admin IP(s), space-separated
+TRUSTED_IPS="${SSH_ALLOWED_IPS}"                  # IPs fail2ban never bans; "" = nobody
 ```
 
 `SSH_ALLOWED_IPS` matters most: only these IPs can reach SSH after the
 script runs. Double-check your current IP is in that list before running.
+
+`TRUSTED_IPS` only affects fail2ban. By default your SSH IPs are never banned;
+set `TRUSTED_IPS=""` if you'd rather not whitelist anyone (for example when
+your IP changes often and old addresses end up with someone else).
 
 If you leave `NEW_USER_SSH_PUBKEY` empty, SSH password authentication stays
 on (weaker, but you won't be locked out without a key ready). If you provide
@@ -92,8 +97,15 @@ changes. The script prints a full post-run checklist at the end.
 8. Disables IPv6 (`sysctl` + GRUB)
 9. Applies kernel `sysctl` hardening (ASLR, anti-spoofing, redirects off,
    SYN cookies, etc.)
-10. Installs and configures fail2ban (sshd + recidive + a custom
-    port-scan jail wired to the UFW logging chain)
+10. Installs and configures fail2ban:
+    - `sshd`: 5 failures in 15 minutes = banned for 90 days
+    - `recidive`: banned 3 times in 24 hours = all ports blocked for a year
+      (reads fail2ban's own log, `backend = auto`)
+    - `portscan`: 5 packets blocked by UFW in 10 minutes = all ports blocked
+      for 90 days. Only `[UFW BLOCK]` packets coming **in** count, read once
+      from the kernel journal; allowed traffic, outgoing blocks and Docker
+      bridges never do. (The port-scan logging chain from step 7 logs every
+      new connection and is for reading only.)
 11. Configures NTP via chrony
 12. Finalizes and rotates its own log
 
